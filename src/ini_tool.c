@@ -11,7 +11,11 @@ typedef enum {
 	MODE_MODIFY,
 	MODE_READ, 
 	MODE_DELETE, 
-	MODE_ADD
+	MODE_ADD, 
+	MODE_SECTION_RENAME, 
+	MODE_SECTION_ADD, 
+	MODE_SECTION_DELETE, 
+	MODE_SECTION_READ
 } MODE;
 
 void print_usage(char * file_name);
@@ -84,6 +88,39 @@ int main (int argc, char ** argv) {
 			print_usage(argv[0]);
 			return 1;
 		}
+	} else if (strncmp(argv[1], "SECTION_RENAME", strlen("SECTION_RENAME")) == 0) {
+		mode = MODE_SECTION_RENAME;
+		if (argc == 5) {
+			section = argv[3];
+			value = argv[4];
+		} else {
+			print_usage(argv[0]);
+			return 1;
+		}
+	} else if (strncmp(argv[1], "SECTION_ADD", strlen("SECTION_ADD")) == 0) {
+		mode = MODE_SECTION_ADD;
+		if (argc == 4) {
+			section = argv[3];
+		} else {
+			print_usage(argv[0]);
+			return 1;
+		}
+	} else if (strncmp(argv[1], "SECTION_DELETE", strlen("SECTION_DELETE")) == 0) {
+		mode = MODE_SECTION_DELETE;
+		if (argc == 4) {
+			section = argv[3];
+		} else {
+			print_usage(argv[0]);
+			return 1;
+		}
+	} else if (strncmp(argv[1], "SECTION_READ", strlen("SECTION_READ")) == 0) {
+		mode = MODE_SECTION_READ;
+		if (argc == 4) {
+			section = argv[3];
+		} else {
+			print_usage(argv[0]);
+			return 1;
+		}
 	} else {
 		print_usage(argv[0]);
 		return 1;
@@ -100,43 +137,58 @@ int main (int argc, char ** argv) {
 
 	if (mode == MODE_MODIFY) {
 		ret = ini_modify(fp, section, key, value, fn);
-
-		if (ret == 0) {
-			ret = 0;
-			printf("Success!\n");
-		} else {
-			ret = 1;
-			printf("Failure!\n");
-		}
 	} else if (mode == MODE_DELETE) {
 		ret = ini_delete(fp, section, key, fn);
-
-		if (ret == 0) {
-			ret = 0;
-			printf("Success!\n");
-		} else {
-			ret = 1;
-			printf("Failure!\n");
-		}
 	} else if (mode == MODE_READ) {
 		char returned_value[MAX_LINE_LEN + 1];
 		ret = ini_read(fp, section, key, returned_value);
 
 		if (ret == 0) {
-			printf("Found!\n");
 			printf("%s\n", returned_value);
-		} else if (ret == -1) {
-			printf("Not found\n");
-			ret = 1;
-		} else if (ret == -2) {
-			ret = 1;
-			printf("A line length exceeded the maximum line length of %d, this is set at compile time.\n", MAX_LINE_LEN);
 		}
 	} else if (mode == MODE_ADD) {
 		ret = ini_add(fp, section, key, value, fn);
+	} else if (mode == MODE_SECTION_RENAME) {
+		ret = ini_rename_section(fp, section, value, fn);
+	} else if (mode == MODE_SECTION_ADD) {
+		ret = ini_add_section(fp, section, fn);
+	} else if (mode == MODE_SECTION_DELETE) {
+		ret = ini_delete_section(fp, section, fn);
+	} else if (mode == MODE_SECTION_READ) {
+		fseek(fp, 0L, SEEK_END);
+		char returned_value[ftell(fp) + 1];
+		rewind(fp);
+
+		ret = ini_read_section(fp, section, returned_value);
+
+		if (ret == 0) {
+			printf("%s\n", returned_value);
+		}
 	} else {
 		print_usage(argv[0]);
 		return 1;
+	}
+
+	switch (ret) {
+		case INI_SUCCESS:
+			printf("Success\n");
+			break;
+		case INI_NOT_FOUND:
+			printf("Selected key/section not found\n");
+			break;
+		case INI_NO_WRITE:
+			printf("Could not open the file as writable\n");
+			break;
+		case INI_MAX_LINE_REACHED:
+			printf("Maximum line length of %d reached, you can modify the value from the header file\n", MAX_LINE_LEN);
+			break;
+		case INI_NOWRITTEN:
+			printf("Selected key/section not found\n");
+			break;
+		
+		default:
+			printf("Failure\n!");
+			break;
 	}
 
 	fclose(fp);
@@ -156,4 +208,12 @@ void print_usage(char * file_name) {
 	printf("\t\tRead the value of a key in a section (optional)\n");
 	printf("\t%s DELETE file_name.ini [section] key\n", file_name);
 	printf("\t\tDelete a key in a section (optional)\n");
+	printf("\t%s SECTION_RENAME file_name.ini section new_name\n", file_name);
+	printf("\t\tRename a section\n");
+	printf("\t%s SECTION_ADD file_name.ini section\n", file_name);
+	printf("\t\tAdd a new section\n");
+	printf("\t%s SECTION_DELETE file_name.ini section\n", file_name);
+	printf("\t\tDelete a section\n");
+	printf("\t%s SECTION_READ file_name.ini section\n", file_name);
+	printf("\t\tRead keys in a section\n");
 }
