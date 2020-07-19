@@ -99,7 +99,7 @@ int main (int argc, char ** argv) {
 	int ret;
 
 	if (mode == MODE_MODIFY) {
-		ret = ini_modify(&fp, section, key, value, fn);
+		ret = ini_modify(fp, section, key, value, fn);
 
 		if (ret == 0) {
 			ret = 0;
@@ -109,7 +109,7 @@ int main (int argc, char ** argv) {
 			printf("Failure!\n");
 		}
 	} else if (mode == MODE_DELETE) {
-		ret = ini_delete(&fp, section, key, fn);
+		ret = ini_delete(fp, section, key, fn);
 
 		if (ret == 0) {
 			ret = 0;
@@ -120,7 +120,7 @@ int main (int argc, char ** argv) {
 		}
 	} else if (mode == MODE_READ) {
 		char returned_value[MAX_LINE_LEN + 1];
-		ret = ini_read(&fp, section, key, returned_value);
+		ret = ini_read(fp, section, key, returned_value);
 
 		if (ret == 0) {
 			printf("Found!\n");
@@ -133,7 +133,7 @@ int main (int argc, char ** argv) {
 			printf("A line length exceeded the maximum line length of %d, this is set at compile time.\n", MAX_LINE_LEN);
 		}
 	} else if (mode == MODE_ADD) {
-		ret = ini_add(&fp, section, key, value, fn);
+		ret = ini_add(fp, section, key, value, fn);
 	} else {
 		print_usage(argv[0]);
 		return 1;

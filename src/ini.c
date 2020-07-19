@@ -110,16 +110,16 @@ static int read_key_value(char * buffer, char * key, char * value) {
 	return 0;
 }
 
-int ini_modify(FILE ** fp, char * section, char * key, char * value, char * fn) {
+int ini_modify(FILE * fp, char * section, char * key, char * value, char * fn) {
 	char buffer[MAX_LINE_LEN + 2];
 	char line_key[MAX_LINE_LEN + 1];
 	char line_value[MAX_LINE_LEN + 1];
 
-	int loc = ftell(*fp);
-	fseek(*fp, 0L, SEEK_END);
-	int len = ftell(*fp);
+	int loc = ftell(fp);
+	fseek(fp, 0L, SEEK_END);
+	int len = ftell(fp);
 
-	fseek(*fp, loc, SEEK_SET);
+	fseek(fp, loc, SEEK_SET);
 
 	char file_mem[len + MAX_LINE_LEN + 2];
 
@@ -130,7 +130,7 @@ int ini_modify(FILE ** fp, char * section, char * key, char * value, char * fn) 
 	bool in_section = false;
 	bool written = false;
 
-	while ((ret = read_line(*fp, buffer)) == 0) {
+	while ((ret = read_line(fp, buffer)) == 0) {
 		if (section) {
 			int sec_mat = section_match(section, buffer);
 			if (sec_mat == 1) {
@@ -158,23 +158,23 @@ int ini_modify(FILE ** fp, char * section, char * key, char * value, char * fn) 
 		return -6;
 	}
 
-	fclose(*fp);
+	FILE * fout = fopen(fn, "w");
 
-	*fp = fopen(fn, "w");
-
-	if (*fp == NULL) {
+	if (fout == NULL) {
 		printf("Could not reopen file in write mode.\n");
 		return -5;
 	}
 
-	fputs(file_mem, *fp);
+	fputs(file_mem, fout);
+
+	fclose(fout);
 	
 	exit(0);
 
 	return ret;
 }
 
-int ini_read(FILE ** fp, char * section, char * key, char * value) {
+int ini_read(FILE * fp, char * section, char * key, char * value) {
 	char buffer[MAX_LINE_LEN + 1];
 
 	char line_key[MAX_LINE_LEN + 1];
@@ -184,7 +184,7 @@ int ini_read(FILE ** fp, char * section, char * key, char * value) {
 
 	bool in_section = false;
 
-	while ((ret = read_line(*fp, buffer)) == 0) {
+	while ((ret = read_line(fp, buffer)) == 0) {
 		if (section) {
 			int sec_mat = section_match(section, buffer);
 			if (sec_mat == 1) {
@@ -198,6 +198,7 @@ int ini_read(FILE ** fp, char * section, char * key, char * value) {
 			if (read_key_value(buffer, line_key, line_value) == 0) {
 				if (strcmp(key, line_key) == 0) {
 					strncpy(value, line_value, MAX_LINE_LEN + 1);
+					value[strlen(line_value)] = 0;
 					break;
 				}
 			}
@@ -207,16 +208,16 @@ int ini_read(FILE ** fp, char * section, char * key, char * value) {
 	return ret;
 }
 
-int ini_delete(FILE ** fp, char * section, char * key, char * fn) {
+int ini_delete(FILE * fp, char * section, char * key, char * fn) {
 	char buffer[MAX_LINE_LEN + 2];
 	char line_key[MAX_LINE_LEN + 1];
 	char line_value[MAX_LINE_LEN + 1];
 
-	int loc = ftell(*fp);
-	fseek(*fp, 0L, SEEK_END);
-	int len = ftell(*fp);
+	int loc = ftell(fp);
+	fseek(fp, 0L, SEEK_END);
+	int len = ftell(fp);
 
-	fseek(*fp, loc, SEEK_SET);
+	fseek(fp, loc, SEEK_SET);
 
 	char file_mem[len + MAX_LINE_LEN + 2];
 
@@ -227,7 +228,7 @@ int ini_delete(FILE ** fp, char * section, char * key, char * fn) {
 	bool in_section = false;
 	bool written = false;
 
-	while ((ret = read_line(*fp, buffer)) == 0) {
+	while ((ret = read_line(fp, buffer)) == 0) {
 		if (section) {
 			int sec_mat = section_match(section, buffer);
 			if (sec_mat == 1) {
@@ -255,22 +256,22 @@ int ini_delete(FILE ** fp, char * section, char * key, char * fn) {
 		return -6;
 	}
 
-	fclose(*fp);
+	FILE * fout = fopen(fn, "w");
 
-	*fp = fopen(fn, "w");
-
-	if (*fp == NULL) {
+	if (fout == NULL) {
 		printf("Could not reopen file in write mode.\n");
 		return -5;
 	}
 
-	fputs(file_mem, *fp);
+	fputs(file_mem, fout);
+
+	fclose(fout);
 	
 	exit(0);
 
 	return ret;
 }
 
-int ini_add(FILE ** fp, char * section, char * key, char * value, char * fn) {
+int ini_add(FILE * fp, char * section, char * key, char * value, char * fn) {
 
 }
