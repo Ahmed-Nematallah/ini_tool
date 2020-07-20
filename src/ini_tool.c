@@ -126,40 +126,34 @@ int main (int argc, char ** argv) {
 		return 1;
 	}
 
-	FILE * fp = fopen(fn, "r");
-
-	if (fp == NULL) {
-		printf("Could not open file\n");
-		return 1;
-	}
-
 	int ret;
 
 	if (mode == MODE_MODIFY) {
-		ret = ini_modify(fp, section, key, value, fn);
+		ret = ini_modify(section, key, value, fn);
 	} else if (mode == MODE_DELETE) {
-		ret = ini_delete(fp, section, key, fn);
+		ret = ini_delete(section, key, fn);
 	} else if (mode == MODE_READ) {
 		char returned_value[MAX_LINE_LEN + 1];
-		ret = ini_read(fp, section, key, returned_value);
+		ret = ini_read(section, key, returned_value, fn);
 
 		if (ret == 0) {
 			printf("%s\n", returned_value);
 		}
 	} else if (mode == MODE_ADD) {
-		ret = ini_add(fp, section, key, value, fn);
+		ret = ini_add(section, key, value, fn);
 	} else if (mode == MODE_SECTION_RENAME) {
-		ret = ini_rename_section(fp, section, value, fn);
+		ret = ini_rename_section(section, value, fn);
 	} else if (mode == MODE_SECTION_ADD) {
-		ret = ini_add_section(fp, section, fn);
+		ret = ini_add_section(section, fn);
 	} else if (mode == MODE_SECTION_DELETE) {
-		ret = ini_delete_section(fp, section, fn);
+		ret = ini_delete_section(section, fn);
 	} else if (mode == MODE_SECTION_READ) {
+		FILE * fp = fopen(fn, "r");
 		fseek(fp, 0L, SEEK_END);
 		char returned_value[ftell(fp) + 1];
-		rewind(fp);
+		fclose(fp);
 
-		ret = ini_read_section(fp, section, returned_value);
+		ret = ini_read_section(section, returned_value, fn);
 
 		if (ret == 0) {
 			printf("%s\n", returned_value);
@@ -176,6 +170,9 @@ int main (int argc, char ** argv) {
 		case INI_NOT_FOUND:
 			printf("Selected key/section not found\n");
 			break;
+		case INI_NO_FILE:
+			printf("Could not open INI file\n");
+			break;
 		case INI_NO_WRITE:
 			printf("Could not open the file as writable\n");
 			break;
@@ -185,13 +182,17 @@ int main (int argc, char ** argv) {
 		case INI_NOWRITTEN:
 			printf("Selected key/section not found\n");
 			break;
+		case INI_SECTION_EXISTS:
+			printf("Section already exists\n");
+			break;
+		case INI_ALREADY_EXISTS:
+			printf("Key already exists\n");
+			break;
 		
 		default:
-			printf("Failure\n!");
+			printf("Failure!\n");
 			break;
 	}
-
-	fclose(fp);
 
 	return ret;
 }

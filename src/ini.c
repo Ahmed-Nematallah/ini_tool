@@ -116,10 +116,14 @@ static int read_key_value(char * buffer, char * key, char * value) {
 	return INI_SUCCESS;
 }
 
-int ini_modify(FILE * fp, char * section, char * key, char * value, char * fn) {
+int ini_modify(char * section, char * key, char * value, char * fn) {
 	char buffer[MAX_LINE_LEN + 2];
 	char line_key[MAX_LINE_LEN + 1];
 	char line_value[MAX_LINE_LEN + 1];
+
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
 
 	fseek(fp, 0L, SEEK_END);
 	int len = ftell(fp);
@@ -155,6 +159,7 @@ int ini_modify(FILE * fp, char * section, char * key, char * value, char * fn) {
 					written = true;
 				}
 			} else if (kvret == INI_MAX_LINE_REACHED) {
+				fclose(fp);
 				return INI_MAX_LINE_REACHED;
 			}
 			
@@ -164,6 +169,8 @@ INI_MODIFY_CONT:
 		strcat(buffer, "\n");
 		strcat(file_mem, buffer);
 	}
+
+	fclose(fp);
 
 	if (written == false) {
 		return INI_NOWRITTEN;
@@ -185,7 +192,11 @@ INI_MODIFY_CONT:
 	return ret;
 }
 
-int ini_read(FILE * fp, char * section, char * key, char * value) {
+int ini_read(char * section, char * key, char * value, char * fn) {
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
+
 	char buffer[MAX_LINE_LEN + 1];
 
 	char line_key[MAX_LINE_LEN + 1];
@@ -196,6 +207,8 @@ int ini_read(FILE * fp, char * section, char * key, char * value) {
 	bool in_section = false;
 
 	rewind(fp);
+
+	bool found = false;
 
 	while ((ret = read_line(fp, buffer)) == INI_SUCCESS) {
 		if (section) {
@@ -213,11 +226,13 @@ int ini_read(FILE * fp, char * section, char * key, char * value) {
 			int kvret = read_key_value(buffer, line_key, line_value);
 			if (kvret == INI_SUCCESS) {
 				if (strcmp(key, line_key) == 0) {
+					found = true;
 					strncpy(value, line_value, MAX_LINE_LEN + 1);
 					value[strlen(line_value)] = 0;
 					break;
 				}
 			} else if (kvret == INI_EOF_REACHED) {
+				fclose(fp);
 				return INI_EOF_REACHED;
 			}
 		}
@@ -226,13 +241,22 @@ INI_READ_CONT:
 		;
 	}
 
+	if (!found)
+		ret = INI_NOT_FOUND;
+
 	if (ret == INI_EOF_REACHED)
 		ret = INI_SUCCESS;
+
+	fclose(fp);
 
 	return ret;
 }
 
-int ini_delete(FILE * fp, char * section, char * key, char * fn) {
+int ini_delete(char * section, char * key, char * fn) {
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
+
 	char buffer[MAX_LINE_LEN + 2];
 	char line_key[MAX_LINE_LEN + 1];
 	char line_value[MAX_LINE_LEN + 1];
@@ -271,6 +295,7 @@ int ini_delete(FILE * fp, char * section, char * key, char * fn) {
 					continue;
 				}
 			} else if (kvret == INI_EOF_REACHED) {
+				fclose(fp);
 				return INI_EOF_REACHED;
 			}
 		}
@@ -279,6 +304,8 @@ INI_DELETE_CONT:
 		strcat(buffer, "\n");
 		strcat(file_mem, buffer);
 	}
+
+	fclose(fp);
 
 	if (written == false) {
 		return INI_NOWRITTEN;
@@ -300,11 +327,103 @@ INI_DELETE_CONT:
 	return ret;
 }
 
-int ini_add(FILE * fp, char * section, char * key, char * value, char * fn) {
+int ini_add(char * section, char * key, char * value, char * fn) {
+	char buffer[MAX_LINE_LEN + 2];
+	char line_key[MAX_LINE_LEN + 1];
+	char line_value[MAX_LINE_LEN + 1];
 
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
+
+	fseek(fp, 0L, SEEK_END);
+	int len = ftell(fp);
+
+	rewind(fp);
+
+	char file_mem[len + MAX_LINE_LEN + 2];
+
+	file_mem[0] = 0;
+
+	int ret;
+
+	bool in_section = false;
+	bool written = false;
+	bool exists = false;
+
+	while ((ret = read_line(fp, buffer)) == INI_SUCCESS) {
+		if (section) {
+			int sec_mat = section_match(section, buffer);
+			if (sec_mat == SECTION_MATCH) {
+				in_section = true;
+				goto INI_ADD_CONT;
+			} else if (sec_mat == SECTION_NOMATCH) {
+				if (in_section && !exists) {
+					char buffer2[MAX_LINE_LEN + 1];
+					sprintf(buffer2, "%s = %s\n\n", key, value);
+					strcat(file_mem, buffer2);
+					written = true;
+				}
+				in_section = false;
+				goto INI_ADD_CONT;
+			}
+		}
+
+		if (in_section || section == NULL) {
+			int kvret = read_key_value(buffer, line_key, line_value);
+			if (kvret == INI_SUCCESS) {
+				if (strcmp(key, line_key) == 0) {
+					exists = true;
+				}
+			} else if (kvret == INI_MAX_LINE_REACHED) {
+				fclose(fp);
+				return INI_MAX_LINE_REACHED;
+			}
+			
+		}
+
+INI_ADD_CONT:
+		strcat(buffer, "\n");
+		strcat(file_mem, buffer);
+	}
+
+	fclose(fp);
+
+	if (exists) {
+		return INI_ALREADY_EXISTS;
+	}
+
+	if (!exists && (!section || in_section)) {
+		sprintf(buffer, "%s = %s\n\n", key, value);
+		written = true;
+		strcat(file_mem, buffer);
+	}
+
+	if (section && !written) {
+		return INI_NOT_FOUND;
+	}
+
+	FILE * fout = fopen(fn, "w");
+
+	if (fout == NULL) {
+		return INI_NO_WRITE;
+	}
+
+	fputs(file_mem, fout);
+
+	fclose(fout);
+
+	if (ret == INI_EOF_REACHED)
+		ret = INI_SUCCESS;
+
+	return ret;
 }
 
-int ini_rename_section(FILE * fp, char * section, char * new_name, char * fn) {
+int ini_rename_section(char * section, char * new_name, char * fn) {
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
+
 	char buffer[MAX_LINE_LEN + 2];
 
 	fseek(fp, 0L, SEEK_END);
@@ -331,6 +450,8 @@ int ini_rename_section(FILE * fp, char * section, char * new_name, char * fn) {
 		strcat(file_mem, buffer);
 	}
 
+	fclose(fp);
+
 	if (written == false) {
 		return INI_NOWRITTEN;
 	}
@@ -351,7 +472,11 @@ int ini_rename_section(FILE * fp, char * section, char * new_name, char * fn) {
 	return ret;
 }
 
-int ini_read_section(FILE * fp, char * section, char * returned_data) {
+int ini_read_section(char * section, char * returned_data, char * fn) {
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
+
 	char buffer[MAX_LINE_LEN + 1];
 
 	char line_key[MAX_LINE_LEN + 1];
@@ -363,10 +488,13 @@ int ini_read_section(FILE * fp, char * section, char * returned_data) {
 
 	rewind(fp);
 
+	bool found = false;
+
 	while ((ret = read_line(fp, buffer)) == INI_SUCCESS) {
 		int sec_mat = section_match(section, buffer);
 		if (sec_mat == SECTION_MATCH) {
 			in_section = true;
+			found = true;
 			goto INI_READ_SECTION_CONT;
 		} else if (sec_mat == SECTION_NOMATCH) {
 			in_section = false;
@@ -379,6 +507,7 @@ int ini_read_section(FILE * fp, char * section, char * returned_data) {
 				strcat(returned_data, line_key);
 				strcat(returned_data, "\n");
 			} else if (kvret == INI_EOF_REACHED) {
+				fclose(fp);
 				return INI_EOF_REACHED;
 			}
 		}
@@ -387,13 +516,22 @@ INI_READ_SECTION_CONT:
 		;
 	}
 
+	if (!found)
+		ret = INI_NOT_FOUND;
+
 	if (ret == INI_EOF_REACHED)
 		ret = INI_SUCCESS;
+
+	fclose(fp);
 
 	return ret;
 }
 
-int ini_delete_section(FILE * fp, char * section, char * fn) {
+int ini_delete_section(char * section, char * fn) {
+	FILE * fp = fopen(fn, "r");
+
+	if (fp == NULL) return INI_NO_FILE;
+
 	char buffer[MAX_LINE_LEN + 1];
 
 	fseek(fp, 0L, SEEK_END);
@@ -427,6 +565,8 @@ int ini_delete_section(FILE * fp, char * section, char * fn) {
 		strcat(file_mem, buffer);
 	}
 
+	fclose(fp);
+
 	if (written == false) {
 		return INI_NOWRITTEN;
 	}
@@ -439,14 +579,45 @@ int ini_delete_section(FILE * fp, char * section, char * fn) {
 
 	fputs(file_mem, fout);
 
-	fclose(fout);
-
 	if (ret == INI_EOF_REACHED)
 		ret = INI_SUCCESS;
+
+	fclose(fout);
 
 	return ret;
 }
 
-int ini_add_section(FILE * fp, char * section, char * fn) {
+int ini_add_section(char * section, char * fn) {
+	FILE * fp = fopen(fn, "r");
 
+	if (fp == NULL) return INI_NO_FILE;
+
+	char buffer[MAX_LINE_LEN + 1];
+
+	int ret;
+
+	rewind(fp);
+
+	bool found = false;
+
+	while ((ret = read_line(fp, buffer)) == INI_SUCCESS) {
+		int sec_mat = section_match(section, buffer);
+		if (sec_mat == SECTION_MATCH) {
+			found = true;
+			break;
+		}
+	}
+
+	fclose(fp);
+
+	if (found) {
+		ret = INI_SECTION_EXISTS;
+	} else {
+		fp = fopen(fn, "a");
+		fprintf(fp, "\n[%s]\n", section);
+		fclose(fp);
+		ret = INI_SUCCESS;
+	}
+
+	return ret;
 }
